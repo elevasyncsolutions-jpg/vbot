@@ -91,8 +91,7 @@ async function runEngineCycle() {
   try {
     const res = await fetch("https://api.dexscreener.com/latest/dex/search?q=solana");
     const data = await res.json();
-    const candidates = (data.pairs || []).filter(p => p.chainId === "solana" && p.volume?.m5 > 50);
-    
+const candidates = (data.pairs || []).filter(p => p.chainId === "solana"); // Removed the > 50 filter    
     logEngine(`Scan active: Found ${candidates.length} tokens.`, "SCAN");
 
     for (const p of candidates.slice(0, 5)) {
