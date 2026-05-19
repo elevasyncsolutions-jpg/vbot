@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Apex Engine V18 | Locked Terminal</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { background-color: #050505; color: #f3f4f6; font-family: 'Inter', system-ui, sans-serif; }
+    .glass-panel { background: #111111; border: 1px solid #262626; border-radius: 12px; }
+    .scroll-area { max-height: 500px; overflow-y: auto; scrollbar-width: thin; scrollbar-color: #404040 transparent; }
+    .neon-text { text-shadow: 0 0 10px rgba(234, 179, 8, 0.4); }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col antialiased">
+
+  <div id="authOverlay" class="fixed inset-0 z-50 flex items-center justify-center bg-[#050505]/95 backdrop-blur-md">
+    <div class="glass-panel p-8 w-full max-w-sm flex flex-col items-center">
+      <h1 class="text-2xl font-bold neon-text text-yellow-400 mb-2">APEX ENGINE V18</h1>
+      <p class="text-gray-500 text-xs mb-6 uppercase tracking-widest">Authentication Required</p>
+      <input id="pwd" type="password" placeholder="Terminal Password" class="w-full bg-[#0a0a0a] border border-gray-800 rounded px-4 py-3 text-white focus:outline-none focus:border-yellow-500 transition mb-4 text-center tracking-widest" onkeypress="if(event.key==='Enter') login()">
+      <button onclick="login()" class="w-full bg-yellow-500/10 text-yellow-500 border border-yellow-500/50 rounded py-3 hover:bg-yellow-500/20 font-bold transition">DECRYPT TERMINAL</button>
+      <p id="authMsg" class="text-red-400 text-xs mt-4 hidden"></p>
+    </div>
+  </div>
+
+  <div id="mainApp" class="hidden flex-1 flex-col gap-6 p-4 md:p-8">
+    <header class="glass-panel p-6 flex justify-between items-center">
+      <div>
+        <h1 class="text-3xl font-extrabold neon-text text-yellow-400">APEX ENGINE V18</h1>
+        <p class="text-sm text-gray-400 mt-1">Autonomous 2x Scalp Strategy • Groq AI Armed</p>
+      </div>
+      <div class="flex gap-3">
+        <button onclick="api('/api/start')" class="px-6 py-2 bg-yellow-500/10 text-yellow-500 border border-yellow-500/50 rounded hover:bg-yellow-500/20 font-bold transition">ARM ENGINE</button>
+        <button onclick="api('/api/stop')" class="px-6 py-2 bg-red-900/30 text-red-400 border border-red-800 rounded hover:bg-red-900/50 font-bold transition">HALT</button>
+      </div>
+    </header>
+
+    <div class="glass-panel flex-1 flex flex-col">
+      <div class="p-4 border-b border-gray-800 flex justify-between items-center bg-[#0a0a0a]">
+        <h2 class="font-bold text-white flex items-center gap-2">
+          <span id="statusIndicator" class="h-3 w-3 rounded-full bg-gray-600"></span>
+          System Logs & Groq Analysis
+        </h2>
+      </div>
+      <div id="logStream" class="flex-1 scroll-area p-4 font-mono text-sm flex flex-col gap-2">
+        <div class="text-gray-500">System standby. Waiting for engine to arm...</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let pollInterval;
+
+    async function login() {
+      const pwd = document.getElementById('pwd').value;
+      try {
+        const res = await fetch('/api/login', { 
+          method: 'POST', 
+          headers: { 'Content-Type': 'application/json' }, 
+          body: JSON.stringify({ password: pwd }) 
+        });
+        
+        if (res.ok) {
+          document.getElementById('authOverlay').classList.add('hidden');
+          document.getElementById('mainApp').classList.remove('hidden');
+          document.getElementById('mainApp').classList.add('flex');
+          fetchLogs();
+          pollInterval = setInterval(fetchLogs, 2000);
+        } else {
+          const msg = document.getElementById('authMsg');
+          msg.innerText = "ACCESS DENIED";
+          msg.classList.remove('hidden');
+        }
+      } catch (e) { console.error(e); }
+    }
+
+    async function api(endpoint) { 
+      await fetch(endpoint, { method: 'POST' }); 
+      fetchLogs(); 
+    }
+
+    function formatLog(log) {
+      let colorClass = "text-gray-400";
+      if (log.type === "ERROR") colorClass = "text-red-400 font-bold";
+      if (log.type === "TRADE" || log.type === "PAYOUT") colorClass = "text-emerald-400 font-bold";
+      if (log.type === "ALERT" || log.type === "SCAN") colorClass = "text-yellow-400";
+      
+      const time = new Date(log.time).toLocaleTimeString();
+      return `<div class="p-2 bg-[#0a0a0a] rounded border border-gray-800/50 flex gap-4">
+                <span class="text-gray-500 shrink-0">[${time}]</span>
+                <span class="text-gray-500 shrink-0 w-16">[${log.type}]</span>
+                <span class="${colorClass}">${log.msg}</span>
+              </div>`;
+    }
+
+    async function fetchLogs() {
+      try {
+        const res = await fetch('/api/status');
+        if (res.status === 401) {
+          clearInterval(pollInterval);
+          window.location.reload();
+          return;
+        }
+        
+        if (res.ok) {
+          const data = await res.json();
+          const indicator = document.getElementById('statusIndicator');
+          
+          if (data.state.running) {
+            indicator.classList.remove('bg-gray-600', 'bg-red-500');
+            indicator.classList.add('bg-emerald-500', 'animate-pulse');
+          } else {
+            indicator.classList.remove('bg-emerald-500', 'animate-pulse');
+            indicator.classList.add('bg-red-500');
+          }
+
+          const logContainer = document.getElementById('logStream');
+          if (data.state.logs && data.state.logs.length > 0) {
+            logContainer.innerHTML = data.state.logs.map(formatLog).join('');
+          }
+        }
+      } catch (e) {
+        console.error("Failed to fetch logs");
+      }
+    }
+  </script>
+</body>
+</html>
